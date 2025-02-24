@@ -15,14 +15,14 @@
     "Package.swift",
     "TlAppleWalletCapacitorPlugin.podspec"
   ],
-  "author": "Thibaud LAMBERT",
+  "author": "Annouar",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/thib-lambert/TLAppleWalletCapacitorPlugin.git"
+    "url": "git+https://github.com/Annouar/TLAppleWalletCapacitorPlugin.git"
   },
   "bugs": {
-    "url": "https://github.com/thib-lambert/TLAppleWalletCapacitorPlugin/issues"
+    "url": "https://github.com/Annouar/TLAppleWalletCapacitorPlugin/issues"
   },
   "keywords": [
     "capacitor",
