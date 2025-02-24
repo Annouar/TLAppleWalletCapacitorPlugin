@@ -24,6 +24,10 @@
   "bugs": {
     "url": "https://github.com/Annouar/TLAppleWalletCapacitorPlugin/issues"
   },
+  "engines": {
+    "node": ">=22.14.0",
+    "pnpm": ">=10.4.1"
+  },
   "keywords": [
     "capacitor",
     "plugin",
