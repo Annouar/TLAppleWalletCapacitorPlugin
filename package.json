@@ -1,6 +1,6 @@
 {
   "name": "tl-apple-wallet-capacitor-plugin",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "This plugin allows you to add passes and credit cards to Apple Wallet",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
