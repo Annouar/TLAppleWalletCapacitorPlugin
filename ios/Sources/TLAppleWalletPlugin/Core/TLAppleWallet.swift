@@ -142,41 +142,91 @@ public class TLAppleWallet: NSObject {
 	}
 	
 	// MARK: - Provisioning
-	@objc
-	func startAddPaymentPass(call: CAPPluginCall,
-							 bridge: (any CAPBridgeProtocol)?) throws {
-		let cardData = try ProvisioningData(data: call.options)
-		self.bridge = bridge
-		self.startAddPaymentPassCallbackId = call.callbackId
-		
-		let request = PKAddPaymentPassRequestConfiguration(encryptionScheme: cardData.encryptionScheme)
-		request?.cardholderName = cardData.cardholderName
-		request?.localizedDescription = cardData.localizedDescription
-		request?.primaryAccountSuffix = cardData.primaryAccountSuffix
-		request?.style = .payment
-		request?.paymentNetwork = cardData.paymentNetwork
-		
-		// This info is needed to prevent PKAddPaymentPassViewController to propose already added pass (phone or watch)
-		if #available(iOS 13.4, *) {
-			if let pass = self.fetchIphonePass(cardSuffix: cardData.primaryAccountSuffix) ?? self.fetchWatchPass(cardSuffix: cardData.primaryAccountSuffix),
-			   let primaryAccountIdentifier = pass.secureElementPass?.primaryAccountIdentifier {
-				request?.primaryAccountIdentifier = primaryAccountIdentifier
-			}
-		} else {
-			if let pass = self.fetchIphonePass(cardSuffix: cardData.primaryAccountSuffix) ?? self.fetchWatchPass(cardSuffix: cardData.primaryAccountSuffix),
-			   let primaryAccountIdentifier = pass.paymentPass?.primaryAccountIdentifier {
-				request?.primaryAccountIdentifier = primaryAccountIdentifier
-			}
-		}
-		
-		guard let request,
-			  let addPaymentPassViewController = PKAddPaymentPassViewController(requestConfiguration: request, delegate: self),
-			  let topViewController = self.bridge?.viewController
-		else { throw ProvisioningError() }
-		
-		self.bridge?.saveCall(call)
-		topViewController.present(addPaymentPassViewController, animated: true)
-	}
+@objc
+func startAddPaymentPass(call: CAPPluginCall, bridge: (any CAPBridgeProtocol)?) throws {
+    // Vérifier d'abord si les fonctionnalités requises sont disponibles
+    guard PKPassLibrary.isPassLibraryAvailable() else {
+        throw PaymentPassProvisioningError.passLibraryUnavailable
+    }
+    
+    guard PKAddPaymentPassViewController.canAddPaymentPass() else {
+        throw PaymentPassProvisioningError.deviceNotSupported
+    }
+    
+    // Vérifier que le pont est disponible
+    guard let bridge = bridge else {
+        throw PaymentPassProvisioningError.bridgeNotAvailable
+    }
+    
+    // Extraire et valider les données de carte
+    let cardData: ProvisioningData
+    do {
+        cardData = try ProvisioningData(data: call.options)
+    } catch let error as ProvisioningDataError {
+        // Transformer les erreurs spécifiques de ProvisioningData
+        switch error {
+        case .dataNil:
+            throw PaymentPassProvisioningError.invalidCardData
+        case .cardholderName:
+            throw PaymentPassProvisioningError.invalidCardData
+        case .localizedDescription:
+            throw PaymentPassProvisioningError.invalidCardData
+        case .paymentNetwork:
+            throw PaymentPassProvisioningError.invalidCardData
+        case .invalidPaymentNetwork:
+            if let network = call.options?["paymentNetwork"] as? String {
+                throw PaymentPassProvisioningError.invalidPaymentNetwork(network)
+            } else {
+                throw PaymentPassProvisioningError.invalidCardData
+            }
+        }
+    } catch {
+        throw PaymentPassProvisioningError.systemLevelError(error)
+    }
+    
+    // Stocker les références
+    self.bridge = bridge
+    self.startAddPaymentPassCallbackId = call.callbackId
+    
+    // Créer la configuration de requête
+    guard let request = PKAddPaymentPassRequestConfiguration(encryptionScheme: cardData.encryptionScheme) else {
+        throw PaymentPassProvisioningError.requestConfigurationFailed
+    }
+    
+    // Configurer la requête
+    request.cardholderName = cardData.cardholderName
+    request.localizedDescription = cardData.localizedDescription
+    request.primaryAccountSuffix = cardData.primaryAccountSuffix
+    request.style = .payment
+    request.paymentNetwork = cardData.paymentNetwork
+    
+    // Gérer les cartes existantes pour éviter les doublons
+    if #available(iOS 13.4, *) {
+        if let pass = self.fetchIphonePass(cardSuffix: cardData.primaryAccountSuffix) ?? self.fetchWatchPass(cardSuffix: cardData.primaryAccountSuffix),
+           let primaryAccountIdentifier = pass.secureElementPass?.primaryAccountIdentifier {
+            request.primaryAccountIdentifier = primaryAccountIdentifier
+        }
+    } else {
+        if let pass = self.fetchIphonePass(cardSuffix: cardData.primaryAccountSuffix) ?? self.fetchWatchPass(cardSuffix: cardData.primaryAccountSuffix),
+           let primaryAccountIdentifier = pass.paymentPass?.primaryAccountIdentifier {
+            request.primaryAccountIdentifier = primaryAccountIdentifier
+        }
+    }
+    
+    // Créer le contrôleur de vue d'ajout de carte
+    guard let addPaymentPassViewController = PKAddPaymentPassViewController(requestConfiguration: request, delegate: self) else {
+        throw PaymentPassProvisioningError.viewControllerCreationFailed
+    }
+    
+    // Obtenir le contrôleur principal pour présenter l'interface
+    guard let topViewController = bridge.viewController else {
+        throw PaymentPassProvisioningError.mainViewControllerNotFound
+    }
+    
+    // Sauvegarder l'appel et présenter l'interface
+    bridge.saveCall(call)
+    topViewController.present(addPaymentPassViewController, animated: true)
+}
 	
 	@objc
 	func completeAddPaymentPass(call: CAPPluginCall) throws {
