@@ -31,7 +31,7 @@ class ProvisioningData: NSObject {
 		self.primaryAccountSuffix = data["primaryAccountSuffix"] as? String
 		self.localizedDescription = localizedDescription
 		
-		switch paymentNetwork {
+		switch paymentNetwork.uppercased() {
 		case "VISA": self.paymentNetwork = .visa
 		case "MASTERCARD": self.paymentNetwork = .masterCard
 		case "CARTES_BANCAIRES": self.paymentNetwork = .cartesBancaires
