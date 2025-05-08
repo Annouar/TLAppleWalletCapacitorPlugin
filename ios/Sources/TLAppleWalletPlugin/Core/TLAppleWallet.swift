@@ -227,7 +227,7 @@ public class TLAppleWallet: NSObject {
 			let configDebug = """
 			Cardholder Name: \(cardData.cardholderName)
 			Description: \(cardData.localizedDescription)
-			Account Suffix: \(cardData.primaryAccountSuffix)
+			Account Suffix: \(String(describing: cardData.primaryAccountSuffix))
 			Payment Network: \(cardData.paymentNetwork)
 			Encryption Scheme: \(cardData.encryptionScheme)
 			"""
@@ -279,7 +279,7 @@ public class TLAppleWallet: NSObject {
 				]
 			]
 			
-			call.reject(error.errorDescription ?? "Unknown error", error.errorCode, errorDetails)
+			call.reject(error.errorDescription ?? "Unknown error", error.errorCode, error as Error)
 			throw error
 			
 		} catch {
@@ -298,7 +298,7 @@ public class TLAppleWallet: NSObject {
 				]
 			]
 			
-			call.reject(systemError.errorDescription ?? "Unknown system error", systemError.errorCode, errorDetails)
+			call.reject(systemError.errorDescription ?? "Unknown system error", systemError.errorCode, systemError as Error)
 			throw systemError
 		}
 	}
