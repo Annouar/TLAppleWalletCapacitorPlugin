@@ -231,40 +231,23 @@ public class TLAppleWallet: NSObject {
 			// Configurer la requête
 			request.cardholderName = cardData.cardholderName
 			request.localizedDescription = cardData.localizedDescription
-			
-			// Validation du primaryAccountSuffix
-			guard let primaryAccountSuffix = cardData.primaryAccountSuffix, !primaryAccountSuffix.isEmpty else {
-				let alert = UIAlertController(title: "Debug Error", message: "Primary Account Suffix is missing or empty", preferredStyle: .alert)
-				alert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge.viewController?.present(alert, animated: true)
-				throw PaymentPassProvisioningError.invalidCardData
-			}
-			request.primaryAccountSuffix = primaryAccountSuffix
-			
-			// Validation du payment network
-			let paymentNetwork = cardData.paymentNetwork
-			if paymentNetwork != .cartesBancaires {
-				let alert = UIAlertController(title: "Debug Warning", message: "Payment Network should be 'cartesBancaires' (lowercase), got: \(paymentNetwork)", preferredStyle: .alert)
-				alert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge.viewController?.present(alert, animated: true)
-			}
-			request.paymentNetwork = paymentNetwork
+			request.primaryAccountSuffix = cardData.primaryAccountSuffix
 			request.style = .payment
+			request.paymentNetwork = cardData.paymentNetwork
 			
-			// Afficher les données de configuration pour debug avec plus de détails
+			// Debug de la configuration
 			let configDebug = """
-			Cardholder Name: \(cardData.cardholderName)
-			Description: \(cardData.localizedDescription)
-			Account Suffix: \(String(describing: cardData.primaryAccountSuffix))
-			Account Suffix Length: \(cardData.primaryAccountSuffix?.count ?? 0)
-			Payment Network: \(cardData.paymentNetwork)
-			Payment Network Raw Value: \(cardData.paymentNetwork.rawValue)
-			Encryption Scheme: \(cardData.encryptionScheme)
-			Encryption Scheme Raw Value: \(cardData.encryptionScheme.rawValue)
+			Request Configuration:
+			- Cardholder Name: \(request.cardholderName ?? "nil")
+			- Description: \(request.localizedDescription ?? "nil")
+			- Account Suffix: \(request.primaryAccountSuffix ?? "nil")
+			- Payment Network: \(request.paymentNetwork)
+			- Encryption Scheme: \(request.encryptionScheme)
+			- Style: \(request.style)
 			"""
-			let alert = UIAlertController(title: "Debug Info", message: configDebug, preferredStyle: .alert)
-			alert.addAction(UIAlertAction(title: "OK", style: .default))
-			bridge.viewController?.present(alert, animated: true)
+			let debugAlert = UIAlertController(title: "Debug - Request Configuration", message: configDebug, preferredStyle: .alert)
+			debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
+			bridge.viewController?.present(debugAlert, animated: true)
 			
 			// Gérer les cartes existantes pour éviter les doublons
 			if #available(iOS 13.4, *) {
