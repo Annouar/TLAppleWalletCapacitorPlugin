@@ -190,33 +190,32 @@ public class TLAppleWallet: NSObject {
 			request.paymentNetwork = .cartesBancaires
 			
 			// Créer le contrôleur de vue d'ajout de carte
-			guard let addPaymentPassViewController = PKAddPaymentPassViewController(requestConfiguration: request, delegate: self) else {
-				// Debug de la configuration qui a échoué
-				let configDebug = """
-				PKAddPaymentPassViewController Creation Failed
-				Configuration used:
-				- Cardholder Name: \(request.cardholderName ?? "nil")
-				- Description: \(request.localizedDescription ?? "nil")
-				- Account Suffix: \(request.primaryAccountSuffix ?? "nil")
-				- Payment Network: \(String(describing: request.paymentNetwork))
-				- Payment Network Raw Value: \(request.paymentNetwork?.rawValue ?? "nil")
-				- Encryption Scheme: \(request.encryptionScheme)
-				- Style: \(request.style)
-				"""
-				let debugAlert = UIAlertController(title: "Debug - PKAddPaymentPassViewController", message: configDebug, preferredStyle: .alert)
-				debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge.viewController?.present(debugAlert, animated: true)
-				throw PaymentPassProvisioningError.viewControllerCreationFailed
+			do {
+				guard let addPaymentPassViewController = PKAddPaymentPassViewController(requestConfiguration: request, delegate: self) else {
+					let error = NSError(domain: "TLAppleWallet", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create PKAddPaymentPassViewController"])
+					let alert = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
+					alert.addAction(UIAlertAction(title: "OK", style: .default))
+					bridge.viewController?.present(alert, animated: true)
+					call.reject(error.localizedDescription, "VIEW_CONTROLLER_CREATION_ERROR", error)
+					return
+				}
+				
+				// Obtenir le contrôleur principal pour présenter l'interface
+				guard let topViewController = bridge.viewController else {
+					throw PaymentPassProvisioningError.mainViewControllerNotFound
+				}
+				
+				// Sauvegarder l'appel et présenter l'interface
+				bridge.saveCall(call)
+				topViewController.present(addPaymentPassViewController, animated: true)
+				
+			} catch let error {
+				let alert = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
+				alert.addAction(UIAlertAction(title: "OK", style: .default))
+				bridge.viewController?.present(alert, animated: true)
+				call.reject(error.localizedDescription, "VIEW_CONTROLLER_CREATION_ERROR", error)
+				return
 			}
-			
-			// Obtenir le contrôleur principal pour présenter l'interface
-			guard let topViewController = bridge.viewController else {
-				throw PaymentPassProvisioningError.mainViewControllerNotFound
-			}
-			
-			// Sauvegarder l'appel et présenter l'interface
-			bridge.saveCall(call)
-			topViewController.present(addPaymentPassViewController, animated: true)
 			
 		} catch let error as PaymentPassProvisioningError {
 			// Gérer les erreurs spécifiques avec des messages détaillés
