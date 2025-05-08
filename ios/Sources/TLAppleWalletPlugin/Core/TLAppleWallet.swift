@@ -174,88 +174,19 @@ public class TLAppleWallet: NSObject {
 			// Extraire et valider les données de carte
 			let cardData: ProvisioningData
 			do {
-				// Normaliser les données reçues du JS
-				var normalizedOptions = call.options ?? [:]
-				
-				// Debug des données originales
-				let originalDebugAlert = UIAlertController(
-					title: "Debug - Original Data",
-					message: """
-					Original Payment Network: \(normalizedOptions["paymentNetwork"] ?? "nil")
-					Original Payment Network Type: \(type(of: normalizedOptions["paymentNetwork"]))
-					""",
-					preferredStyle: .alert
-				)
-				originalDebugAlert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge.viewController?.present(originalDebugAlert, animated: true)
-				
-				// Normaliser le paymentNetwork
-				if let paymentNetwork = normalizedOptions["paymentNetwork"] as? String {
-					// Convertir CARTES_BANCAIRES en cartesBancaires
-					if paymentNetwork.uppercased() == "CARTES_BANCAIRES" {
-						normalizedOptions["paymentNetwork"] = "cartesBancaires"
-						
-						// Debug de la conversion
-						let conversionDebugAlert = UIAlertController(
-							title: "Debug - Network Conversion",
-							message: """
-							Before: \(paymentNetwork)
-							After: cartesBancaires
-							""",
-							preferredStyle: .alert
-						)
-						conversionDebugAlert.addAction(UIAlertAction(title: "OK", style: .default))
-						bridge.viewController?.present(conversionDebugAlert, animated: true)
-					}
-				}
-				
-				// Normaliser le primaryAccountSuffix
-				if let suffix = normalizedOptions["primaryAccountNumberSuffix"] as? String {
-					normalizedOptions["primaryAccountSuffix"] = suffix
-					normalizedOptions.removeValue(forKey: "primaryAccountNumberSuffix")
-				}
-				
-				// Normaliser la description
-				if let description = normalizedOptions["localizedDescription"] as? String {
-					// Enlever les guillemets simples supplémentaires
-					normalizedOptions["localizedDescription"] = description.replacingOccurrences(of: "'", with: "")
-				}
-				
-				// Debug des données normalisées
+				// Debug des données reçues
 				let debugAlert = UIAlertController(
-					title: "Debug - Normalized Data",
+					title: "Debug - Received Data",
 					message: """
-					Original Data:
+					Received Data:
 					\(call.options ?? [:])
-					
-					Normalized Data:
-					\(normalizedOptions)
-					
-					Payment Network Value:
-					\(normalizedOptions["paymentNetwork"] ?? "nil")
-					Payment Network Type:
-					\(type(of: normalizedOptions["paymentNetwork"]))
 					""",
 					preferredStyle: .alert
 				)
 				debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
 				bridge.viewController?.present(debugAlert, animated: true)
 				
-				// Vérification finale du payment network
-				if let finalNetwork = normalizedOptions["paymentNetwork"] as? String {
-					let finalCheckAlert = UIAlertController(
-						title: "Debug - Final Check",
-						message: """
-						Final Payment Network: \(finalNetwork)
-						Is Equal to cartesBancaires: \(finalNetwork == "cartesBancaires")
-						""",
-						preferredStyle: .alert
-					)
-					finalCheckAlert.addAction(UIAlertAction(title: "OK", style: .default))
-					bridge.viewController?.present(finalCheckAlert, animated: true)
-				}
-				
-				cardData = try ProvisioningData(data: normalizedOptions)
+				cardData = try ProvisioningData(data: call.options)
 			} catch let error as ProvisioningDataError {
 				let alert = UIAlertController(title: "Debug Info", message: "Card data validation failed: \(error)", preferredStyle: .alert)
 				alert.addAction(UIAlertAction(title: "OK", style: .default))
