@@ -150,70 +150,27 @@ public class TLAppleWallet: NSObject {
 		do {
 			// Vérifier d'abord si les fonctionnalités requises sont disponibles
 			guard PKPassLibrary.isPassLibraryAvailable() else {
-				let alert = UIAlertController(title: "Debug Info", message: "Pass Library is not available", preferredStyle: .alert)
-				alert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge?.viewController?.present(alert, animated: true)
 				throw PaymentPassProvisioningError.passLibraryUnavailable
 			}
 			
 			guard PKAddPaymentPassViewController.canAddPaymentPass() else {
-				let alert = UIAlertController(title: "Debug Info", message: "Device does not support adding payment passes", preferredStyle: .alert)
-				alert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge?.viewController?.present(alert, animated: true)
 				throw PaymentPassProvisioningError.deviceNotSupported
 			}
 			
 			// Vérifier que le pont est disponible
 			guard let bridge = bridge else {
-				let alert = UIAlertController(title: "Debug Info", message: "Bridge is not available", preferredStyle: .alert)
-				alert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge?.viewController?.present(alert, animated: true)
 				throw PaymentPassProvisioningError.bridgeNotAvailable
 			}
 			
 			// Extraire et valider les données de carte
 			let cardData: ProvisioningData
 			do {
-				// Debug des données reçues
-				let debugAlert = UIAlertController(
-					title: "Debug - Received Data",
-					message: """
-					Received Data:
-					\(call.options ?? [:])
-					""",
-					preferredStyle: .alert
-				)
-				debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge.viewController?.present(debugAlert, animated: true)
-				
 				cardData = try ProvisioningData(data: call.options)
 			} catch let error as ProvisioningDataError {
 				let alert = UIAlertController(title: "Debug Info", message: "Card data validation failed: \(error)", preferredStyle: .alert)
 				alert.addAction(UIAlertAction(title: "OK", style: .default))
 				bridge.viewController?.present(alert, animated: true)
-				// Transformer les erreurs spécifiques de ProvisioningData avec plus de détails
-				switch error {
-				case .dataNil:
-					throw PaymentPassProvisioningError.invalidCardData
-				case .cardholderName:
-					throw PaymentPassProvisioningError.invalidCardData
-				case .localizedDescription:
-					throw PaymentPassProvisioningError.invalidCardData
-				case .paymentNetwork:
-					throw PaymentPassProvisioningError.invalidCardData
-				case .invalidPaymentNetwork:
-					if let network = call.options?["paymentNetwork"] as? String {
-						throw PaymentPassProvisioningError.invalidPaymentNetwork(network)
-					} else {
-						throw PaymentPassProvisioningError.invalidCardData
-					}
-				case .encryptionScheme:
-					throw PaymentPassProvisioningError.invalidCardData
-				case .invalidEncryptionScheme:
-					throw PaymentPassProvisioningError.invalidCardData
-				}
-			} catch {
-				throw PaymentPassProvisioningError.systemLevelError(error)
+				throw error
 			}
 			
 			// Stocker les références
@@ -222,9 +179,6 @@ public class TLAppleWallet: NSObject {
 			
 			// Créer la configuration de requête
 			guard let request = PKAddPaymentPassRequestConfiguration(encryptionScheme: cardData.encryptionScheme) else {
-				let alert = UIAlertController(title: "Debug Info", message: "Failed to create request configuration with encryption scheme: \(cardData.encryptionScheme)", preferredStyle: .alert)
-				alert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge.viewController?.present(alert, animated: true)
 				throw PaymentPassProvisioningError.requestConfigurationFailed
 			}
 			
@@ -235,38 +189,22 @@ public class TLAppleWallet: NSObject {
 			request.style = .payment
 			request.paymentNetwork = cardData.paymentNetwork
 			
-			// Debug de la configuration
-			let configDebug = """
-			Request Configuration:
-			- Cardholder Name: \(request.cardholderName ?? "nil")
-			- Description: \(request.localizedDescription ?? "nil")
-			- Account Suffix: \(request.primaryAccountSuffix ?? "nil")
-			- Payment Network: \(request.paymentNetwork)
-			- Encryption Scheme: \(request.encryptionScheme)
-			- Style: \(request.style)
-			"""
-			let debugAlert = UIAlertController(title: "Debug - Request Configuration", message: configDebug, preferredStyle: .alert)
-			debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
-			bridge.viewController?.present(debugAlert, animated: true)
-			
-			// Gérer les cartes existantes pour éviter les doublons
-			if #available(iOS 13.4, *) {
-				if let pass = self.fetchIphonePass(cardSuffix: cardData.primaryAccountSuffix) ?? self.fetchWatchPass(cardSuffix: cardData.primaryAccountSuffix),
-				   let primaryAccountIdentifier = pass.secureElementPass?.primaryAccountIdentifier {
-					request.primaryAccountIdentifier = primaryAccountIdentifier
-				}
-			} else {
-				if let pass = self.fetchIphonePass(cardSuffix: cardData.primaryAccountSuffix) ?? self.fetchWatchPass(cardSuffix: cardData.primaryAccountSuffix),
-				   let primaryAccountIdentifier = pass.paymentPass?.primaryAccountIdentifier {
-					request.primaryAccountIdentifier = primaryAccountIdentifier
-				}
-			}
-			
 			// Créer le contrôleur de vue d'ajout de carte
 			guard let addPaymentPassViewController = PKAddPaymentPassViewController(requestConfiguration: request, delegate: self) else {
-				let alert = UIAlertController(title: "Debug Info", message: "Failed to create PKAddPaymentPassViewController", preferredStyle: .alert)
-				alert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge.viewController?.present(alert, animated: true)
+				// Debug de la configuration qui a échoué
+				let configDebug = """
+				PKAddPaymentPassViewController Creation Failed
+				Configuration used:
+				- Cardholder Name: \(request.cardholderName ?? "nil")
+				- Description: \(request.localizedDescription ?? "nil")
+				- Account Suffix: \(request.primaryAccountSuffix ?? "nil")
+				- Payment Network: \(request.paymentNetwork)
+				- Encryption Scheme: \(request.encryptionScheme)
+				- Style: \(request.style)
+				"""
+				let debugAlert = UIAlertController(title: "Debug - PKAddPaymentPassViewController", message: configDebug, preferredStyle: .alert)
+				debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
+				bridge.viewController?.present(debugAlert, animated: true)
 				throw PaymentPassProvisioningError.viewControllerCreationFailed
 			}
 			
