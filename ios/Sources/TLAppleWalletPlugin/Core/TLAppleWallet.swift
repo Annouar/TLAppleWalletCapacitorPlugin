@@ -181,7 +181,7 @@ public class TLAppleWallet: NSObject {
 				if let paymentNetwork = normalizedOptions["paymentNetwork"] as? String {
 					// Convertir CARTES_BANCAIRES en cartesBancaires
 					if paymentNetwork.uppercased() == "CARTES_BANCAIRES" {
-						normalizedOptions["paymentNetwork"] = "cartesBancaires"
+						normalizedOptions["paymentNetwork"] = PKPaymentNetwork.cartesBancaires.rawValue
 					}
 				}
 				
@@ -206,6 +206,9 @@ public class TLAppleWallet: NSObject {
 					
 					Normalized Data:
 					\(normalizedOptions)
+					
+					Payment Network Value:
+					\(normalizedOptions["paymentNetwork"] ?? "nil")
 					""",
 					preferredStyle: .alert
 				)
