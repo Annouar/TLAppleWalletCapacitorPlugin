@@ -177,11 +177,35 @@ public class TLAppleWallet: NSObject {
 				// Normaliser les données reçues du JS
 				var normalizedOptions = call.options ?? [:]
 				
+				// Debug des données originales
+				let originalDebugAlert = UIAlertController(
+					title: "Debug - Original Data",
+					message: """
+					Original Payment Network: \(normalizedOptions["paymentNetwork"] ?? "nil")
+					Original Payment Network Type: \(type(of: normalizedOptions["paymentNetwork"]))
+					""",
+					preferredStyle: .alert
+				)
+				originalDebugAlert.addAction(UIAlertAction(title: "OK", style: .default))
+				bridge.viewController?.present(originalDebugAlert, animated: true)
+				
 				// Normaliser le paymentNetwork
 				if let paymentNetwork = normalizedOptions["paymentNetwork"] as? String {
 					// Convertir CARTES_BANCAIRES en cartesBancaires
 					if paymentNetwork.uppercased() == "CARTES_BANCAIRES" {
-						normalizedOptions["paymentNetwork"] = PKPaymentNetwork.cartesBancaires.rawValue
+						normalizedOptions["paymentNetwork"] = "cartesBancaires"
+						
+						// Debug de la conversion
+						let conversionDebugAlert = UIAlertController(
+							title: "Debug - Network Conversion",
+							message: """
+							Before: \(paymentNetwork)
+							After: cartesBancaires
+							""",
+							preferredStyle: .alert
+						)
+						conversionDebugAlert.addAction(UIAlertAction(title: "OK", style: .default))
+						bridge.viewController?.present(conversionDebugAlert, animated: true)
 					}
 				}
 				
@@ -209,11 +233,27 @@ public class TLAppleWallet: NSObject {
 					
 					Payment Network Value:
 					\(normalizedOptions["paymentNetwork"] ?? "nil")
+					Payment Network Type:
+					\(type(of: normalizedOptions["paymentNetwork"]))
 					""",
 					preferredStyle: .alert
 				)
 				debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
 				bridge.viewController?.present(debugAlert, animated: true)
+				
+				// Vérification finale du payment network
+				if let finalNetwork = normalizedOptions["paymentNetwork"] as? String {
+					let finalCheckAlert = UIAlertController(
+						title: "Debug - Final Check",
+						message: """
+						Final Payment Network: \(finalNetwork)
+						Is Equal to cartesBancaires: \(finalNetwork == "cartesBancaires")
+						""",
+						preferredStyle: .alert
+					)
+					finalCheckAlert.addAction(UIAlertAction(title: "OK", style: .default))
+					bridge.viewController?.present(finalCheckAlert, animated: true)
+				}
 				
 				cardData = try ProvisioningData(data: normalizedOptions)
 			} catch let error as ProvisioningDataError {
