@@ -192,8 +192,19 @@ public class TLAppleWallet: NSObject {
 			// Créer le contrôleur de vue d'ajout de carte
 			do {
 				guard let addPaymentPassViewController = PKAddPaymentPassViewController(requestConfiguration: request, delegate: self) else {
-					let error = NSError(domain: "TLAppleWallet", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create PKAddPaymentPassViewController"])
-					let alert = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
+					let error = NSError(domain: "TLAppleWallet", 
+									  code: -1, 
+									  userInfo: [
+										NSLocalizedDescriptionKey: "Failed to create PKAddPaymentPassViewController"
+									  ])
+					
+					let alert = UIAlertController(title: "Error", 
+												message: """
+												Exception: \(error.localizedDescription)
+												Code: \(error.code)
+												Details: \(error.userInfo)
+												""", 
+												preferredStyle: .alert)
 					alert.addAction(UIAlertAction(title: "OK", style: .default))
 					bridge.viewController?.present(alert, animated: true)
 					call.reject(error.localizedDescription, "VIEW_CONTROLLER_CREATION_ERROR", error)
@@ -210,7 +221,14 @@ public class TLAppleWallet: NSObject {
 				topViewController.present(addPaymentPassViewController, animated: true)
 				
 			} catch let error {
-				let alert = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
+				let alert = UIAlertController(title: "Error", 
+											message: """
+											\(error.localizedDescription)
+											Error Type: \(type(of: error))
+											Error Domain: \(error._domain)
+											Error Code: \(error._code)
+											""", 
+											preferredStyle: .alert)
 				alert.addAction(UIAlertAction(title: "OK", style: .default))
 				bridge.viewController?.present(alert, animated: true)
 				call.reject(error.localizedDescription, "VIEW_CONTROLLER_CREATION_ERROR", error)
