@@ -210,7 +210,7 @@ public class TLAppleWallet: NSObject {
 					preferredStyle: .alert
 				)
 				debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
-				bridge?.viewController?.present(debugAlert, animated: true)
+				bridge.viewController?.present(debugAlert, animated: true)
 				
 				cardData = try ProvisioningData(data: normalizedOptions)
 			} catch let error as ProvisioningDataError {
