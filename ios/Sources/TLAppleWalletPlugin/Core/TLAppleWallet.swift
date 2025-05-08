@@ -174,7 +174,45 @@ public class TLAppleWallet: NSObject {
 			// Extraire et valider les données de carte
 			let cardData: ProvisioningData
 			do {
-				cardData = try ProvisioningData(data: call.options)
+				// Normaliser les données reçues du JS
+				var normalizedOptions = call.options ?? [:]
+				
+				// Normaliser le paymentNetwork
+				if let paymentNetwork = normalizedOptions["paymentNetwork"] as? String {
+					// Convertir CARTES_BANCAIRES en cartesBancaires
+					if paymentNetwork.uppercased() == "CARTES_BANCAIRES" {
+						normalizedOptions["paymentNetwork"] = "cartesBancaires"
+					}
+				}
+				
+				// Normaliser le primaryAccountSuffix
+				if let suffix = normalizedOptions["primaryAccountNumberSuffix"] as? String {
+					normalizedOptions["primaryAccountSuffix"] = suffix
+					normalizedOptions.removeValue(forKey: "primaryAccountNumberSuffix")
+				}
+				
+				// Normaliser la description
+				if let description = normalizedOptions["localizedDescription"] as? String {
+					// Enlever les guillemets simples supplémentaires
+					normalizedOptions["localizedDescription"] = description.replacingOccurrences(of: "'", with: "")
+				}
+				
+				// Debug des données normalisées
+				let debugAlert = UIAlertController(
+					title: "Debug - Normalized Data",
+					message: """
+					Original Data:
+					\(call.options ?? [:])
+					
+					Normalized Data:
+					\(normalizedOptions)
+					""",
+					preferredStyle: .alert
+				)
+				debugAlert.addAction(UIAlertAction(title: "OK", style: .default))
+				bridge?.viewController?.present(debugAlert, animated: true)
+				
+				cardData = try ProvisioningData(data: normalizedOptions)
 			} catch let error as ProvisioningDataError {
 				let alert = UIAlertController(title: "Debug Info", message: "Card data validation failed: \(error)", preferredStyle: .alert)
 				alert.addAction(UIAlertAction(title: "OK", style: .default))
@@ -219,17 +257,36 @@ public class TLAppleWallet: NSObject {
 			// Configurer la requête
 			request.cardholderName = cardData.cardholderName
 			request.localizedDescription = cardData.localizedDescription
-			request.primaryAccountSuffix = cardData.primaryAccountSuffix
-			request.style = .payment
-			request.paymentNetwork = cardData.paymentNetwork
 			
-			// Afficher les données de configuration pour debug
+			// Validation du primaryAccountSuffix
+			guard let primaryAccountSuffix = cardData.primaryAccountSuffix, !primaryAccountSuffix.isEmpty else {
+				let alert = UIAlertController(title: "Debug Error", message: "Primary Account Suffix is missing or empty", preferredStyle: .alert)
+				alert.addAction(UIAlertAction(title: "OK", style: .default))
+				bridge.viewController?.present(alert, animated: true)
+				throw PaymentPassProvisioningError.invalidCardData
+			}
+			request.primaryAccountSuffix = primaryAccountSuffix
+			
+			// Validation du payment network
+			let paymentNetwork = cardData.paymentNetwork
+			if paymentNetwork != .cartesBancaires {
+				let alert = UIAlertController(title: "Debug Warning", message: "Payment Network should be 'cartesBancaires' (lowercase), got: \(paymentNetwork)", preferredStyle: .alert)
+				alert.addAction(UIAlertAction(title: "OK", style: .default))
+				bridge.viewController?.present(alert, animated: true)
+			}
+			request.paymentNetwork = paymentNetwork
+			request.style = .payment
+			
+			// Afficher les données de configuration pour debug avec plus de détails
 			let configDebug = """
 			Cardholder Name: \(cardData.cardholderName)
 			Description: \(cardData.localizedDescription)
 			Account Suffix: \(String(describing: cardData.primaryAccountSuffix))
+			Account Suffix Length: \(cardData.primaryAccountSuffix?.count ?? 0)
 			Payment Network: \(cardData.paymentNetwork)
+			Payment Network Raw Value: \(cardData.paymentNetwork.rawValue)
 			Encryption Scheme: \(cardData.encryptionScheme)
+			Encryption Scheme Raw Value: \(cardData.encryptionScheme.rawValue)
 			"""
 			let alert = UIAlertController(title: "Debug Info", message: configDebug, preferredStyle: .alert)
 			alert.addAction(UIAlertAction(title: "OK", style: .default))
