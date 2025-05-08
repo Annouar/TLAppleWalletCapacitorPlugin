@@ -187,30 +187,7 @@ public class TLAppleWallet: NSObject {
 			request.localizedDescription = cardData.localizedDescription
 			request.primaryAccountSuffix = cardData.primaryAccountSuffix
 			request.style = .payment
-			
-			// Debug du payment network avant l'assignation
-			let networkDebug = """
-			Payment Network Debug:
-			- Original value from cardData: \(cardData.paymentNetwork)
-			- Raw value: \(cardData.paymentNetwork.rawValue)
-			- Type: \(type(of: cardData.paymentNetwork))
-			"""
-			let networkAlert = UIAlertController(title: "Debug - Payment Network", message: networkDebug, preferredStyle: .alert)
-			networkAlert.addAction(UIAlertAction(title: "OK", style: .default))
-			bridge.viewController?.present(networkAlert, animated: true)
-			
-			request.paymentNetwork = cardData.paymentNetwork
-			
-			// Debug du payment network après l'assignation
-			let networkAfterDebug = """
-			Payment Network After Assignment:
-			- Value in request: \(request.paymentNetwork)
-			- Raw value: \(request.paymentNetwork.rawValue)
-			- Type: \(type(of: request.paymentNetwork))
-			"""
-			let networkAfterAlert = UIAlertController(title: "Debug - Payment Network After", message: networkAfterDebug, preferredStyle: .alert)
-			networkAfterAlert.addAction(UIAlertAction(title: "OK", style: .default))
-			bridge.viewController?.present(networkAfterAlert, animated: true)
+			request.paymentNetwork = .cartesBancaires
 			
 			// Créer le contrôleur de vue d'ajout de carte
 			guard let addPaymentPassViewController = PKAddPaymentPassViewController(requestConfiguration: request, delegate: self) else {
@@ -221,7 +198,8 @@ public class TLAppleWallet: NSObject {
 				- Cardholder Name: \(request.cardholderName ?? "nil")
 				- Description: \(request.localizedDescription ?? "nil")
 				- Account Suffix: \(request.primaryAccountSuffix ?? "nil")
-				- Payment Network: \(request.paymentNetwork)
+				- Payment Network: \(String(describing: request.paymentNetwork))
+				- Payment Network Raw Value: \(request.paymentNetwork?.rawValue ?? "nil")
 				- Encryption Scheme: \(request.encryptionScheme)
 				- Style: \(request.style)
 				"""
