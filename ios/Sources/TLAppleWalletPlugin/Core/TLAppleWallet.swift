@@ -187,7 +187,7 @@ public class TLAppleWallet: NSObject {
 			request.localizedDescription = cardData.localizedDescription
 			request.primaryAccountSuffix = cardData.primaryAccountSuffix
 			request.style = .payment
-			request.paymentNetwork = .cartesBancaires
+			request.paymentNetwork = "cartesBancaires"
 			
 			// Créer le contrôleur de vue d'ajout de carte
 			do {

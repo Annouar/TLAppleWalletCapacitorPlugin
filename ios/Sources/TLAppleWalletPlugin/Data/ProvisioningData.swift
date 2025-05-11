@@ -34,7 +34,7 @@ class ProvisioningData: NSObject {
 		switch paymentNetwork.uppercased() {
 		case "VISA": self.paymentNetwork = .visa
 		case "MASTERCARD": self.paymentNetwork = .masterCard
-		case "CARTES_BANCAIRES": self.paymentNetwork = .cartesBancaires
+		case "CARTES_BANCAIRES": self.paymentNetwork = "cartesBancaires"
 		default: throw ProvisioningDataError.invalidPaymentNetwork
 		}
 		
