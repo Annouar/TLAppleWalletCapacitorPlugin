@@ -67,6 +67,7 @@ public class TLAppleWalletPlugin: CAPPlugin, CAPBridgedPlugin {
 	
 	@objc
 	func startAddPaymentPass(_ call: CAPPluginCall) {
+		// Ensure we're on the main thread for UI operations
 		DispatchQueue.main.async { [implementation, bridge] in
 			do {
 				try implementation.startAddPaymentPass(call: call, bridge: bridge)
@@ -78,10 +79,13 @@ public class TLAppleWalletPlugin: CAPPlugin, CAPBridgedPlugin {
 	
 	@objc
 	public func completeAddPaymentPass(_ call: CAPPluginCall) {
-		do {
-			try self.implementation.completeAddPaymentPass(call: call)
-		} catch {
-			call.reject(error.localizedDescription)
+		// Ensure we're on the main thread for UI operations
+		DispatchQueue.main.async { [implementation] in
+			do {
+				try implementation.completeAddPaymentPass(call: call)
+			} catch {
+				call.reject(error.localizedDescription)
+			}
 		}
 	}
 }

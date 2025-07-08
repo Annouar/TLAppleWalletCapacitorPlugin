@@ -22,6 +22,12 @@ public class TLAppleWallet: NSObject {
 	private var bridge: (any CAPBridgeProtocol)?
 	private var provisioningHandler: ((PKAddPaymentPassRequest) -> Void)?
 	
+	// MARK: - State Management
+	private var isProvisioningInProgress = false
+	private let provisioningTimeout: TimeInterval = 30.0
+	private var provisioningTimer: Timer?
+	private var currentViewController: PKAddPaymentPassViewController?
+	
 	// MARK: - Init
 	@objc
 	public func initialize() throws {
@@ -141,10 +147,58 @@ public class TLAppleWallet: NSObject {
 		}
 	}
 	
+	// MARK: - State Management
+	private func cleanupProvisioning() {
+		isProvisioningInProgress = false
+		startAddPaymentPassCallbackId = nil
+		completeAddPaymentPassCallbackId = nil
+		provisioningHandler = nil
+		currentViewController = nil
+		
+		provisioningTimer?.invalidate()
+		provisioningTimer = nil
+	}
+	
+	private func startProvisioningTimeout() {
+		provisioningTimer?.invalidate()
+		provisioningTimer = Timer.scheduledTimer(withTimeInterval: provisioningTimeout, repeats: false) { [weak self] _ in
+			DispatchQueue.main.async {
+				self?.handleProvisioningTimeout()
+			}
+		}
+	}
+	
+	private func handleProvisioningTimeout() {
+		if isProvisioningInProgress {
+			cleanupProvisioning()
+			
+			// Notify any pending calls
+			if let startCallbackId = startAddPaymentPassCallbackId,
+			   let call = bridge?.savedCall(withID: startCallbackId) {
+				call.reject("Provisioning timeout")
+				bridge?.releaseCall(call)
+			}
+			
+			if let completeCallbackId = completeAddPaymentPassCallbackId,
+			   let call = bridge?.savedCall(withID: completeCallbackId) {
+				call.reject("Provisioning timeout")
+				bridge?.releaseCall(call)
+			}
+		}
+	}
+	
 	// MARK: - Provisioning
 	@objc
 	func startAddPaymentPass(call: CAPPluginCall,
 							 bridge: (any CAPBridgeProtocol)?) throws {
+		// Check if provisioning is already in progress
+		guard !isProvisioningInProgress else {
+			throw ProvisioningError.alreadyInProgress
+		}
+		
+		isProvisioningInProgress = true
+		startProvisioningTimeout()
+		
 		let cardData = try ProvisioningData(data: call.options)
 		self.bridge = bridge
 		self.startAddPaymentPassCallbackId = call.callbackId
@@ -172,14 +226,27 @@ public class TLAppleWallet: NSObject {
 		guard let request,
 			  let addPaymentPassViewController = PKAddPaymentPassViewController(requestConfiguration: request, delegate: self),
 			  let topViewController = self.bridge?.viewController
-		else { throw ProvisioningError() }
+		else { 
+			cleanupProvisioning()
+			throw ProvisioningError.general 
+		}
 		
+		currentViewController = addPaymentPassViewController
 		self.bridge?.saveCall(call)
-		topViewController.present(addPaymentPassViewController, animated: true)
+		
+		// Ensure we're on the main thread for UI operations
+		DispatchQueue.main.async {
+			topViewController.present(addPaymentPassViewController, animated: true)
+		}
 	}
 	
 	@objc
 	func completeAddPaymentPass(call: CAPPluginCall) throws {
+		// Check if provisioning is in progress
+		guard isProvisioningInProgress else {
+			throw ProvisioningError.notInProgress
+		}
+		
 		guard let options = call.options else { throw AddPaymentError.dataNil }
 		
 		guard let encryptedPassData = options["encryptedPassData"] as? String,
@@ -201,7 +268,14 @@ public class TLAppleWallet: NSObject {
 		requestPayPass.ephemeralPublicKey = Data(hex: ephemeralPublicKey)
 		requestPayPass.activationData = Data(hex: activationData)
 		
-		self.provisioningHandler?(requestPayPass)
+		// Add a small delay to ensure UI is ready and runloop is stable
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+			// Force runloop to process any pending UI updates
+			RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
+			
+			// Then execute the provisioning handler
+			self?.provisioningHandler?(requestPayPass)
+		}
 	}
 }
 
@@ -213,11 +287,38 @@ extension TLAppleWallet: PKAddPaymentPassViewControllerDelegate {
 											 nonce: Data,
 											 nonceSignature: Data,
 											 completionHandler handler: @escaping (PKAddPaymentPassRequest) -> Void) {
-		guard let startAddPaymentPassCallbackId,
-			  let call = self.bridge?.savedCall(withID: startAddPaymentPassCallbackId)
-		else { return }
 		
-		self.provisioningHandler = handler
+		// Validate controller state
+		guard controller.presentingViewController != nil,
+			  !controller.isBeingDismissed else {
+			print("[DEBUG] Controller is not properly presented or being dismissed")
+			return
+		}
+		
+		guard let startAddPaymentPassCallbackId,
+			  let call = self.bridge?.savedCall(withID: startAddPaymentPassCallbackId),
+			  isProvisioningInProgress
+		else { 
+			print("[DEBUG] Invalid state for provisioning")
+			return 
+		}
+		
+		// Cancel timeout since we got the callback
+		provisioningTimer?.invalidate()
+		provisioningTimer = nil
+		
+		self.provisioningHandler = { [weak self] request in
+			// Ensure we're still in a valid state
+			guard let self = self,
+				  self.isProvisioningInProgress,
+				  controller.presentingViewController != nil,
+				  !controller.isBeingDismissed else {
+				print("[DEBUG] Invalid state when executing provisioning handler")
+				return
+			}
+			
+			handler(request)
+		}
 		
 		call.resolve([
 			"nonce": nonce.hexadecimal,
@@ -232,9 +333,15 @@ extension TLAppleWallet: PKAddPaymentPassViewControllerDelegate {
 	public func addPaymentPassViewController(_ controller: PKAddPaymentPassViewController,
 											 didFinishAdding pass: PKPaymentPass?,
 											 error: (any Error)?) {
+		
 		controller.dismiss(animated: true) { [weak self] in
-			guard let completeAddPaymentPassCallbackId = self?.completeAddPaymentPassCallbackId,
-				  let call = self?.bridge?.savedCall(withID: completeAddPaymentPassCallbackId)
+			guard let self = self else { return }
+			
+			// Cleanup state
+			self.cleanupProvisioning()
+			
+			guard let completeAddPaymentPassCallbackId = self.completeAddPaymentPassCallbackId,
+				  let call = self.bridge?.savedCall(withID: completeAddPaymentPassCallbackId)
 			else { return }
 			
 			if let error {
@@ -242,6 +349,8 @@ extension TLAppleWallet: PKAddPaymentPassViewControllerDelegate {
 			} else {
 				call.resolve()
 			}
+			
+			self.bridge?.releaseCall(call)
 		}
 	}
 }
